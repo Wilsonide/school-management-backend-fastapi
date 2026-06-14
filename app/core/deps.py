@@ -1,0 +1,168 @@
+from typing import Annotated
+
+from fastapi import Depends, HTTPException, status
+from jose import JWTError, jwt
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.config import settings
+from app.db.database import get_db
+from app.models.user import User, UserRole
+from app.utils.helper import JWTBearer
+
+# =====================================================
+# JWT AUTH SCHEME
+# =====================================================
+oauth2_scheme = JWTBearer()
+
+
+# =====================================================
+# GET CURRENT USER (CORE AUTH)
+# =====================================================
+async def get_current_user(
+    session: Annotated[AsyncSession, Depends(get_db)],
+    access_token: str = Depends(oauth2_scheme),
+) -> User:
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+    try:
+        payload = jwt.decode(
+            access_token,
+            settings.secret_key,
+            algorithms=[settings.algorithm],
+        )
+
+        user_id: str = payload.get("sub")
+
+        if not user_id:
+            raise credentials_exception
+
+    except JWTError:
+        raise credentials_exception  # noqa: B904
+
+    user = await session.get(User, user_id)
+
+    if not user:
+        raise credentials_exception
+
+    if not user.is_active:
+        raise HTTPException(
+            status_code=403,
+            detail="Inactive user account",
+        )
+
+    return user
+
+
+# =====================================================
+# VERIFIED USER GUARD
+# =====================================================
+async def requires_verified_user(user: Annotated[User, Depends(get_current_user)]):
+    if hasattr(user, "is_verified") and not user.is_verified:
+        raise HTTPException(
+            status_code=403,
+            detail="Email verification required",
+        )
+    return user
+
+
+# =====================================================
+# ROLE BASED ACCESS CONTROL (RBAC)
+# =====================================================
+def require_roles(*allowed_roles: UserRole):
+    def dependency(user: Annotated[User, Depends(get_current_user)]):
+        if user.role not in allowed_roles:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Access denied. Required roles: {allowed_roles}",
+            )
+
+        return user
+
+    return dependency
+
+
+# =====================================================
+# ADMIN ONLY
+# =====================================================
+def require_admin(user: Annotated[User, Depends(get_current_user)]):
+    if user.role not in {UserRole.SCHOOL_ADMIN, UserRole.SUPER_ADMIN}:
+        raise HTTPException(
+            status_code=403,
+            detail="Admin access required",
+        )
+
+    return user
+
+
+# =====================================================
+# SUPER ADMIN ONLY
+# =====================================================
+def require_superadmin(user: Annotated[User, Depends(get_current_user)]):
+    if user.role != UserRole.SUPER_ADMIN:
+        raise HTTPException(
+            status_code=403,
+            detail="Super admin access required",
+        )
+
+    return user
+
+
+# =====================================================
+# SCHOOL ADMIN ONLY
+# =====================================================
+def require_school_admin(user: Annotated[User, Depends(get_current_user)]):
+    if user.role != UserRole.SCHOOL_ADMIN:
+        raise HTTPException(
+            status_code=403,
+            detail="School admin access required",
+        )
+    return user
+
+
+# =====================================================
+# MULTI-SCHOOL ISOLATION GUARD (CRITICAL FOR SAAS)
+# =====================================================
+def require_same_school_resource(resource_school_id: str):
+    def dependency(user: CurrentUser):
+        if str(user.school_id) != str(resource_school_id):
+            raise HTTPException(
+                status_code=403,
+                detail="Cross-school access denied",
+            )
+
+        return True
+
+    return dependency
+
+
+# =====================================================
+# COMMON TYPE ALIASES (CLEANER ENDPOINTS)
+# =====================================================
+DBSession = Annotated[AsyncSession, Depends(get_db)]
+CurrentUser = Annotated[User, Depends(get_current_user)]
+VerifiedUser = Annotated[User, Depends(requires_verified_user)]
+RequireAdmin = Annotated[User, Depends(require_admin)]
+RequireSuperAdmin = Annotated[User, Depends(require_superadmin)]
+RequireSchoolAdmin = Annotated[User, Depends(require_school_admin)]
+
+
+""" @router.get("/grades")
+async def get_grades(user=Depends(get_current_user)):
+
+    require_roles("TEACHER", "ADMIN")(user)
+
+    return {"message": "Grades data"}
+
+
+from app.core.scope import ensure_same_school
+
+@router.get("/students/{school_id}")
+async def get_students(school_id: str, user=Depends(get_current_user)):
+
+    ensure_same_school(user, school_id)
+
+    return {"message": "Students list for this school"} """
