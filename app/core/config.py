@@ -11,8 +11,8 @@ class Settings(BaseSettings):
     cloudinary_api_key: str
     cloudinary_api_secret: str
     smtp_password: str
-    domain: str = "http://localhost:8000"
-    frontend_url: str = "http://localhost:3000"
+    domain: str
+    frontend_url: str
     secret_key: str
     paystack_secret_key: str
 
