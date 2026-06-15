@@ -25,6 +25,29 @@ class SchoolAssignmentService:
             "count": len(students),
         }
 
+    async def get_school_students(
+        self,
+        db,
+        school_id: str,
+    ):
+        students = await self.repo.get_school_students(
+            db,
+            school_id,
+        )
+
+        return {
+            "students": [
+                {
+                    "id": str(student.id),
+                    "first_name": student.first_name,
+                    "last_name": student.last_name,
+                    "email": student.email,
+                }
+                for student in students
+            ],
+            "count": len(students),
+        }
+
     async def remove_student_from_class(
         self,
         db,

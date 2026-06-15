@@ -5,26 +5,23 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import DBSession, RequireSchoolAdmin
 from app.db.database import get_db
+from app.schemas.academic_session import (
+    AcademicSessionCreate,
+)
+from app.schemas.term import (
+    TermCreate,
+)
+from app.services.academic_session_service import (
+    academic_session_service,
+)
 from app.services.class_subject_service import class_subject_service
 from app.services.school_admin_service import school_admin_service
 from app.services.school_assignment_service import school_assignment_service
 from app.services.school_class_service import school_class_service
-from app.services.timetable_service import timetable_service
-from app.schemas.academic_session import (
-    AcademicSessionCreate,
-)
-
-from app.schemas.term import (
-    TermCreate,
-)
-
-from app.services.academic_session_service import (
-    academic_session_service,
-)
-
 from app.services.term_service import (
     term_service,
 )
+from app.services.timetable_service import timetable_service
 
 router = APIRouter(
     prefix="/school-admin",
@@ -84,6 +81,17 @@ async def get_students(
     user: RequireSchoolAdmin,
 ):
     return await school_assignment_service.get_students(db, user.school_id, class_id)
+
+
+@router.get("/students")
+async def get_school_students(
+    current_user: RequireSchoolAdmin,
+    db: DBSession,
+):
+    return await school_assignment_service.get_school_students(
+        db,
+        str(current_user.school_id),
+    )
 
 
 @router.get("/{class_id}/teachers")
@@ -230,7 +238,9 @@ async def remove_student(
 
     return {"message": "Student removed from class"}
 
+
 # ======================================= Session ========================================================
+
 
 @router.post("/sessions")
 async def create_session(
@@ -254,7 +264,10 @@ async def get_sessions(
         db,
         user.school_id,
     )
+
+
 # ======================================= Term ========================================================
+
 
 @router.post("/terms")
 async def create_term(
