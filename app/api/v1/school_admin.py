@@ -103,6 +103,17 @@ async def get_teachers(class_id: str, db: DBSession, user: RequireSchoolAdmin):
     )
 
 
+@router.get("/teachers")
+async def get_school_teachers(
+    current_user: RequireSchoolAdmin,
+    db: DBSession,
+):
+    return await school_assignment_service.get_school_teachers(
+        db,
+        str(current_user.school_id),
+    )
+
+
 @router.post("/classes/{class_id}/assign-student/{student_id}")
 async def assign_student(
     class_id: str,

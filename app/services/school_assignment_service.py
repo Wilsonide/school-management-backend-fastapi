@@ -79,6 +79,29 @@ class SchoolAssignmentService:
             "count": len(teachers),
         }
 
+    async def get_school_teachers(
+        self,
+        db,
+        school_id: str,
+    ):
+        teachers = await self.repo.get_school_teachers(
+            db,
+            school_id,
+        )
+
+        return {
+            "teachers": [
+                {
+                    "id": str(teacher.id),
+                    "first_name": teacher.first_name,
+                    "last_name": teacher.last_name,
+                    "email": teacher.email,
+                }
+                for teacher in teachers
+            ],
+            "count": len(teachers),
+        }
+
     async def assign_student(self, db, student_id: str, class_id: str):
         return await self.repo.assign_student(db, student_id, class_id)
 
