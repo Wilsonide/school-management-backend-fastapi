@@ -2,7 +2,7 @@ from datetime import datetime
 from enum import Enum
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, DateTime, String, Text
+from sqlalchemy import Boolean, DateTime, String, Text, UniqueConstraint
 from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -36,6 +36,7 @@ class User(Base, UUIDMixin, TimestampMixin, TenantMixin):
 
     email = mapped_column(String(255), unique=True)
 
+    username = mapped_column(String(255),nullable = True)
     avatar_url: Mapped[str | None] = mapped_column(
     String(255),
     nullable=True,
@@ -84,3 +85,11 @@ class User(Base, UUIDMixin, TimestampMixin, TenantMixin):
     )
 
     school = relationship("School", back_populates="users")
+
+    __table_args__ = (
+        UniqueConstraint(
+            "school_id",
+            "username",
+            name="uq_school_username",
+        ),
+    )

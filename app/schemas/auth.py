@@ -4,14 +4,14 @@ from app.schemas.user import UserPublic
 
 
 class LoginRequest(BaseModel):
-    email: str
+    username: str
     password: str
 
 
 class RegisterRequest(BaseModel):
-    email: str
+    username: str
     password: str
-    invite_code: str
+    email: str
 
 class ForgotPasswordRequest(BaseModel):
     email: str

@@ -35,7 +35,15 @@ class UserService:
         await self.profile_service.create_profile(db, user)
 
         return user
-
+    async def get_school_by_slug(
+    self,
+    db,
+    slug: str,
+):
+        return await self.repo.get_school_by_slug(
+            db,
+            slug,
+        )
     # =====================================
     # GET USER BY EMAIL
     # =====================================
@@ -47,12 +55,27 @@ class UserService:
     # =====================================
     async def get_by_id(self, db, user_id: str):
         return await self.repo.get_by_id(db, user_id)
+    
+    async def get_by_username(self, db, username: str):
+        return await self.repo.get_by_username(db, username)
 
     # =====================================
     # GET ALL USERS
     # =====================================
     async def get_all_users(self, db):
         return await self.repo.get_all(db)
+    
+    async def get_by_school_slug_and_username(
+    self,
+    db,
+    school_slug: str,
+    username: str,
+):
+        return await self.repo.get_by_school_slug_and_username(
+            db,
+            school_slug,
+            username,
+        )
 
     # =====================================
     # DELETE USER

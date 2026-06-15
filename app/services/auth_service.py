@@ -6,7 +6,7 @@ import secrets
 
 from app.repositories.refresh_token_repository import RefreshTokenRepository
 from app.services.email_service import email_service
-from app.services.invite_service import InviteService
+
 from app.services.user_service import UserService
 from app.utils.helper import create_access_token, create_refresh_token, hash_password, hash_refresh_token, verify_password
 
@@ -14,58 +14,130 @@ from app.utils.helper import create_access_token, create_refresh_token, hash_pas
 class AuthService:
     def __init__(self):
         self.user_service = UserService()
-        self.invite_service = InviteService()
         self.refresh_repo = RefreshTokenRepository()
         self.email_service = email_service  # Placeholder for email sending service
 
-    async def register(self, db, email, password, invite_code):
-        invite = await self.invite_service.get_by_code(db, invite_code)
-
-        if not invite or invite.is_used:
-            return None
-
-        user = await self.user_service.create_user_with_profile(
-            db=db,
-            email=email,
-            password=hash_password(password),
-            role=invite.role,
-            school_id=invite.school_id,
+    async def register(
+    self,
+    db,
+    username: str,
+    email: str,
+    password: str,
+    school_slug: str,
+):
+        school = await self.user_service.get_school_by_slug(
+            db,
+            school_slug,
         )
 
-        await self.invite_service.mark_used(db, invite)
+        if not school:
+            return None
 
-        return user
-
-    async def login(self, db, email, password):
-
-        user = await self.user_service.get_by_email(
+        existing_email = await self.user_service.get_by_email(
             db,
             email,
         )
 
-        if not user:
+        if existing_email:
             return None
 
+        existing_username = (
+            await self.user_service.get_by_school_slug_and_username(
+                db,
+                school_slug,
+                username,
+            )
+        )
+
+        if existing_username:
+            return None
+
+        user = await self.user_service.create_user_with_profile(
+            db=db,
+            username=username,
+            email=email,
+            password=hash_password(password),
+            role="STUDENT",  # default role
+            school_id=school.id,
+        )
+
+        return user
+
+    async def login(
+    self,
+    db,
+    username: str,
+    password: str,
+):
+
+        user = None
+
+        # -----------------------------------
+        # SCHOOL ADMIN / SUPER ADMIN
+        # login without school slug
+        # Example:
+        # superadmin
+        # schooladmin
+        # -----------------------------------
+        if "_" not in username:
+
+            user = await self.user_service.get_by_email(
+                db,
+                username,
+            )
+
+            if not user:
+                return None
+
+        # -----------------------------------
+        # STUDENTS / TEACHERS / PARENTS
+        # Example:
+        # lerna_john
+        # -----------------------------------
+        else:
+
+            school_slug, actual_username = username.split("_", 1)
+
+            user = await self.user_service.get_by_school_slug_and_username(
+                db,
+                school_slug,
+                actual_username,
+            )
+
+            if not user:
+                return None
+
+        # -----------------------------------
+        # VERIFY PASSWORD
+        # -----------------------------------
         if not verify_password(
             password,
             user.password_hash,
         ):
             return None
 
+        # -----------------------------------
+        # CREATE TOKENS
+        # -----------------------------------
         access_token = create_access_token(
             {
                 "sub": str(user.id),
                 "role": user.role,
-                "school_id": str(user.school_id),
+                "school_id": (
+                    str(user.school_id)
+                    if user.school_id
+                    else None
+                ),
             }
         )
-        
 
         refresh_token = create_refresh_token()
 
         refresh_db = RefreshToken(
             user_id=user.id,
-            token_hash=hash_refresh_token(refresh_token),
+            token_hash=hash_refresh_token(
+                refresh_token,
+            ),
             expires_at=datetime.now(UTC)
             + timedelta(days=30),
         )
@@ -81,14 +153,18 @@ class AuthService:
             "user": {
                 "id": str(user.id),
                 "email": user.email,
+                "username": user.username,
                 "role": user.role,
                 "first_name": user.first_name,
                 "last_name": user.last_name,
-                "school_id": str(user.school_id),
+                "school_id": (
+                    str(user.school_id)
+                    if user.school_id
+                    else None
+                ),
                 "profile_completed": user.profile_completed,
             },
         }
-    
     async def forgot_password(self, db, email: str):
 
         user = await self.user_service.get_by_email(db, email)

@@ -30,7 +30,7 @@ async def register(
         db=db,
         email=payload.email,
         password=payload.password,
-        invite_code=payload.invite_code,
+        username=payload.username,
     )
 
     if not user:
@@ -42,7 +42,7 @@ async def register(
     # 🔐 AUTO LOGIN AFTER REGISTER
     result = await auth_service.login(
         db,
-        payload.email,
+        payload.username,
         payload.password,
     )
 
@@ -79,7 +79,7 @@ async def login(
 ):
     result = await auth_service.login(
         db,
-        payload.email,
+        payload.username,
         payload.password,
     )
 
