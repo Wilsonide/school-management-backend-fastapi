@@ -144,7 +144,10 @@ async def logout(
 ):
 
     response.delete_cookie(
-        "refresh_token"
+        key="refresh_token",
+        secure=True,
+        httponly=True,
+        samesite="none",
     )
 
     return {
