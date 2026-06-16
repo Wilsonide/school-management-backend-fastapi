@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Response
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import CurrentUser
@@ -58,7 +58,7 @@ async def register(
         value=result["refresh_token"],
         httponly=True,
         secure=True,
-        samesite="lax",
+        samesite="none",
         max_age=60 * 60 * 24 * 30,
     )
 
@@ -74,9 +74,11 @@ async def register(
 @router.post("/login")
 async def login(
     payload: LoginRequest,
+    request: Request,
     response: Response,
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
+    print(await request.body())
     result = await auth_service.login(
         db,
         payload.username,
