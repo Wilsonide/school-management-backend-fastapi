@@ -1,15 +1,94 @@
 import secrets
 
+from slugify import slugify
+
 from app.models.school import School
-from app.models.user import UserRole
+from app.models.user import User, UserRole
 from app.repositories.school_repository import SchoolRepository
 from app.repositories.user_repository import UserRepository
+from app.utils.helper import hash_password
+
+
+class SchoolAlreadyExistsError(Exception):
+    pass
 
 
 class SchoolService:
     def __init__(self):
         self.repo = SchoolRepository()
         self.user_repo = UserRepository()
+
+    async def onboard_school(
+        self,
+        db,
+        payload,
+    ):
+        slug = slugify(
+            payload.school_name,
+        )
+
+        existing = await self.repo.get_by_slug(
+            db,
+            slug,
+        )
+
+        if existing:
+            raise SchoolAlreadyExistsError(
+                "School already exists",
+            )
+
+        school_code = f"SCH-{secrets.token_hex(3).upper()}"
+
+        school = School(
+            name=payload.school_name,
+            slug=slug,
+            email=payload.admin_email,
+            phone=payload.phone,
+            address=payload.address,
+            state=payload.state,
+            website=payload.website,
+            description=payload.description,
+            whatsapp_number=payload.whatsapp_number,
+            average_fee_range=payload.average_fee_range,
+            population_range=payload.population_range,
+            referral_source=payload.referral_source,
+            code=school_code,
+        )
+
+        db.add(school)
+
+        await db.flush()
+        existing_user = await self.user_repo.get_by_email(
+            db,
+            payload.admin_email,
+        )
+
+        if existing_user:
+            raise SchoolAlreadyExistsError(
+                "Email already exists",
+            )
+
+        admin = User(
+            first_name=payload.admin_first_name,
+            last_name=payload.admin_last_name,
+            email=payload.admin_email,
+            username="admin",
+            password_hash=hash_password(payload.admin_password),
+            role=UserRole.SCHOOL_ADMIN,
+            school_id=school.id,
+            profile_completed=True,
+        )
+
+        db.add(admin)
+
+        await db.commit()
+
+        await db.refresh(school)
+
+        return {
+            "school": school,
+            "admin": admin,
+        }
 
     # =====================================================
     # CREATE SCHOOL

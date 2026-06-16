@@ -4,6 +4,7 @@ from sqlalchemy import Boolean, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin, UUIDMixin
+
 if TYPE_CHECKING:
     from app.models.academic_session import AcademicSession
     from app.models.attendance import Attendance
@@ -11,7 +12,6 @@ if TYPE_CHECKING:
     from app.models.exam import Exam
     from app.models.refresh_token import RefreshToken
     from app.models.user import User
-
 
 
 class School(Base, UUIDMixin, TimestampMixin):
@@ -26,6 +26,7 @@ class School(Base, UUIDMixin, TimestampMixin):
 
     email: Mapped[str] = mapped_column(String(255))
     phone: Mapped[str] = mapped_column(String(50))
+    state: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
     logo_url: Mapped[str | None] = mapped_column(String(255))
     address: Mapped[str | None] = mapped_column(Text)
@@ -38,9 +39,38 @@ class School(Base, UUIDMixin, TimestampMixin):
         Boolean,
         default=True,
     )
+    description: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+    )
+
+    contact_person: Mapped[str | None] = mapped_column(
+        String(255),
+        nullable=True,
+    )
+
+    whatsapp_number: Mapped[str | None] = mapped_column(
+        String(50),
+        nullable=True,
+    )
+
+    average_fee_range: Mapped[str | None] = mapped_column(
+        String(100),
+        nullable=True,
+    )
+
+    population_range: Mapped[str | None] = mapped_column(
+        String(100),
+        nullable=True,
+    )
+
+    referral_source: Mapped[str | None] = mapped_column(
+        String(100),
+        nullable=True,
+    )
 
     users: Mapped[list["User"]] = relationship(
-    "User",
-    back_populates="school",
-    cascade="all, delete-orphan",
-)
+        "User",
+        back_populates="school",
+        cascade="all, delete-orphan",
+    )

@@ -8,6 +8,7 @@ from app.db.database import get_db
 from app.schemas.academic_session import (
     AcademicSessionCreate,
 )
+from app.schemas.school import SchoolOnboardingRequest
 from app.schemas.term import (
     TermCreate,
 )
@@ -18,6 +19,7 @@ from app.services.class_subject_service import class_subject_service
 from app.services.school_admin_service import school_admin_service
 from app.services.school_assignment_service import school_assignment_service
 from app.services.school_class_service import school_class_service
+from app.services.school_service import SchoolService
 from app.services.term_service import (
     term_service,
 )
@@ -27,6 +29,7 @@ router = APIRouter(
     prefix="/school-admin",
     tags=["School Admin"],
 )
+school_service = SchoolService()
 
 
 # =========================
@@ -302,3 +305,23 @@ async def get_terms(
         db,
         user.school_id,
     )
+
+
+@router.post("/onboard")
+async def onboard_school(
+    payload: SchoolOnboardingRequest,
+    db: Annotated[
+        AsyncSession,
+        Depends(get_db),
+    ],
+):
+    result = await school_service.onboard_school(
+        db,
+        payload,
+    )
+
+    return {
+        "message": "School registered successfully",
+        "school_code": result["school"].code,
+        "slug": result["school"].slug,
+    }

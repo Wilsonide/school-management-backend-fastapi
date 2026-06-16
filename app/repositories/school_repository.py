@@ -4,7 +4,6 @@ from app.models.school import School
 
 
 class SchoolRepository:
-
     async def create(self, db, school: School):
         db.add(school)
 
@@ -15,23 +14,26 @@ class SchoolRepository:
         return school
 
     async def get_all(self, db):
-        result = await db.execute(
-            select(School).order_by(School.created_at.desc())
-        )
+        result = await db.execute(select(School).order_by(School.created_at.desc()))
 
         return result.scalars().all()
 
     async def get_by_id(self, db, school_id):
-        result = await db.execute(
-            select(School).where(School.id == school_id)
-        )
+        result = await db.execute(select(School).where(School.id == school_id))
 
         return result.scalars().first()
 
+    async def get_by_slug(
+        self,
+        db,
+        slug: str,
+    ):
+        result = await db.execute(select(School).where(School.slug == slug))
+
+        return result.scalar_one_or_none()
+
     async def get_by_code(self, db, code):
-        result = await db.execute(
-            select(School).where(School.code == code)
-        )
+        result = await db.execute(select(School).where(School.code == code))
 
         return result.scalars().first()
 
