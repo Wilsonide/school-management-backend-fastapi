@@ -54,6 +54,23 @@ class AcademicSessionRepository:
         await db.delete(session)
 
         await db.commit()
+    async def get_active(
+        self,
+        db: AsyncSession,
+        school_id: str | None = None,
+    ):
+        query = select(AcademicSession).where(
+            AcademicSession.is_active == True
+        )
+
+        if school_id:
+            query = query.where(
+                AcademicSession.school_id == school_id
+            )
+
+        result = await db.execute(query)
+
+        return result.scalar_one_or_none()
 
 
 academic_session_repo = AcademicSessionRepository()

@@ -6,8 +6,8 @@ class UserBase(BaseModel):
     email: EmailStr
     role: str
     school_id: UUID| None 
-    first_name: str
-    last_name: str
+    first_name: str| None
+    last_name: str|None
 
 class UserOut(UserBase):
     id: UUID

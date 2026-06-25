@@ -21,18 +21,20 @@ class UserService:
         password: str,
         role,
         school_id: str,
+        username: str,
     ):
         user = User(
             email=email,
-            password=password,
+            password_hash=password,
             role=role,
             school_id=school_id,
             profile_completed=False,
+            username = username,
         )
 
         user = await self.repo.create(db, user)
 
-        await self.profile_service.create_profile(db, user)
+        """ await self.profile_service.create_profile(db, user) """
 
         return user
     async def get_school_by_slug(

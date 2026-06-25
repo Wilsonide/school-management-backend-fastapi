@@ -1,8 +1,8 @@
+from datetime import date
 from typing import Union
+from uuid import UUID
 
 from pydantic import BaseModel
-from datetime import date
-from uuid import UUID
 
 
 class BaseProfileResponse(BaseModel):
@@ -11,13 +11,11 @@ class BaseProfileResponse(BaseModel):
     school_id: UUID
 
 
-
 class StudentProfileCreate(BaseModel):
     admission_number: str
     admission_date: date
     date_of_birth: date
     gender: str
-    class_id: UUID
 
 
 class StudentProfileUpdate(BaseModel):
@@ -35,7 +33,6 @@ class StudentProfileResponse(StudentProfileCreate):
 
     class Config:
         from_attributes = True
-
 
 
 class TeacherProfileCreate(BaseModel):
@@ -59,6 +56,7 @@ class TeacherProfileResponse(TeacherProfileCreate):
 
     class Config:
         from_attributes = True
+
 
 class ParentProfileCreate(BaseModel):
     occupation: str

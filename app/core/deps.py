@@ -123,6 +123,24 @@ def require_school_admin(user: Annotated[User, Depends(get_current_user)]):
     return user
 
 
+def require_teacher(user: Annotated[User, Depends(get_current_user)]):
+    if user.role != UserRole.TEACHER:
+        raise HTTPException(
+            status_code=403,
+            detail="School admin access required",
+        )
+    return user
+
+
+def require_student(user: Annotated[User, Depends(get_current_user)]):
+    if user.role != UserRole.STUDENT:
+        raise HTTPException(
+            status_code=403,
+            detail="School admin access required",
+        )
+    return user
+
+
 # =====================================================
 # MULTI-SCHOOL ISOLATION GUARD (CRITICAL FOR SAAS)
 # =====================================================
@@ -148,21 +166,5 @@ VerifiedUser = Annotated[User, Depends(requires_verified_user)]
 RequireAdmin = Annotated[User, Depends(require_admin)]
 RequireSuperAdmin = Annotated[User, Depends(require_superadmin)]
 RequireSchoolAdmin = Annotated[User, Depends(require_school_admin)]
-
-
-""" @router.get("/grades")
-async def get_grades(user=Depends(get_current_user)):
-
-    require_roles("TEACHER", "ADMIN")(user)
-
-    return {"message": "Grades data"}
-
-
-from app.core.scope import ensure_same_school
-
-@router.get("/students/{school_id}")
-async def get_students(school_id: str, user=Depends(get_current_user)):
-
-    ensure_same_school(user, school_id)
-
-    return {"message": "Students list for this school"} """
+RequireTeacher = Annotated[User, Depends(require_teacher)]
+RequireStudent = Annotated[User, Depends(require_student)]

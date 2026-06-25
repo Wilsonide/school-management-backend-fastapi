@@ -23,8 +23,8 @@ class AuthService:
     username: str,
     email: str,
     password: str,
-    school_slug: str,
 ):
+        school_slug, actual_username = username.split("_", 1)
         school = await self.user_service.get_school_by_slug(
             db,
             school_slug,
@@ -45,7 +45,7 @@ class AuthService:
             await self.user_service.get_by_school_slug_and_username(
                 db,
                 school_slug,
-                username,
+                actual_username,
             )
         )
 
@@ -54,7 +54,7 @@ class AuthService:
 
         user = await self.user_service.create_user_with_profile(
             db=db,
-            username=username,
+            username=actual_username,
             email=email,
             password=hash_password(password),
             role="STUDENT",  # default role

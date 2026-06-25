@@ -121,3 +121,42 @@ def invite_token_expiry() -> datetime:
 
 def hash_token(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
+def calculate_positions(results: list):
+    results = sorted(results, key=lambda x: x["total"], reverse=True)
+
+    pos = 1
+    for r in results:
+        r["position"] = pos
+        pos += 1
+
+    return results
+
+def calculate_grade(total: int):
+    if total >= 70:
+        return "A"
+    elif total >= 60:
+        return "B"
+    elif total >= 50:
+        return "C"
+    elif total >= 45:
+        return "D"
+    return "F"
+
+def serialize_lesson(lesson) -> dict:
+    return {
+        "id": str(lesson.id),
+
+        "title": lesson.title,
+        "topic": lesson.topic,
+        "objectives": lesson.objectives,
+        "file_url": lesson.file_url,
+
+        "class_name": lesson.class_obj.name if lesson.class_obj else None,
+        "subject_name": lesson.subject.name if lesson.subject else None,
+        "session_name": lesson.session.name if lesson.session else None,
+        "term_name": lesson.term.name if lesson.term else None,
+
+        "is_published": lesson.is_published,
+        "created_at": lesson.created_at,
+    }
+

@@ -3,9 +3,11 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.deps import RequireSuperAdmin
+from app.core.deps import DBSession, RequireSuperAdmin
 from app.db.database import get_db
+from app.schemas.lesson import LessonCreate, LessonUpdate
 from app.services.admin_service import AdminService
+from app.services.lesson_service import lesson_service
 
 router = APIRouter(
     prefix="/admin",
@@ -13,6 +15,75 @@ router = APIRouter(
 )
 
 service = AdminService()
+
+
+# =====================================================
+# GET SCHOOLS
+# =====================================================
+@router.get("/schools")
+async def get_schools(
+    db: Annotated[
+        AsyncSession,
+        Depends(get_db),
+    ],
+    _: RequireSuperAdmin,
+):
+    schools = await service.get_schools(db)
+
+    return {
+        "schools": schools,
+    }
+
+
+# =====================================================
+# CREATE SCHOOL
+# =====================================================
+@router.post("/schools")
+async def create_school(
+    payload: dict,
+    db: Annotated[
+        AsyncSession,
+        Depends(get_db),
+    ],
+    _: RequireSuperAdmin,
+):
+    school = await service.create_school(
+        db,
+        payload,
+    )
+
+    return {
+        "message": "School created successfully",
+        "school": school,
+    }
+
+
+# =====================================================
+# DELETE SCHOOL
+# =====================================================
+@router.delete("/schools/{school_id}")
+async def delete_school(
+    school_id: str,
+    db: Annotated[
+        AsyncSession,
+        Depends(get_db),
+    ],
+    _: RequireSuperAdmin,
+):
+    deleted = await service.delete_school(
+        db,
+        school_id,
+    )
+
+    if not deleted:
+        raise HTTPException(
+            status_code=404,
+            detail="School not found",
+        )
+
+    return {
+        "message": "School deleted successfully",
+    }
 
 
 # =====================================
@@ -128,3 +199,86 @@ async def revoke_school_admin(
         "message": "School admin revoked",
         "user": user,
     }
+
+
+@router.post("/lessons")
+async def create_lesson(
+    payload: LessonCreate,
+    db: DBSession,
+    user: RequireSuperAdmin,
+):
+    return await lesson_service.create_lesson(
+        db,
+        payload,
+        str(user.id),
+    )
+
+
+@router.patch("/lessons/{lesson_id}")
+async def update_lesson(
+    lesson_id: str,
+    payload: LessonUpdate,
+    db: DBSession,
+    _: RequireSuperAdmin,
+):
+    lesson = await lesson_service.update_lesson(
+        db,
+        lesson_id,
+        payload,
+    )
+
+    if not lesson:
+        raise HTTPException(
+            status_code=404,
+            detail="Lesson not found",
+        )
+
+    return lesson
+
+
+@router.get("/lessons")
+async def get_all_lessons(
+    db: DBSession,
+    _: RequireSuperAdmin,
+):
+    return await lesson_service.get_all_lessons(
+        db,
+    )
+
+
+@router.get("/lessons/{lesson_id}")
+async def get_lesson(
+    lesson_id: str,
+    db: DBSession,
+    _: RequireSuperAdmin,
+):
+    lesson = await lesson_service.get_lesson_by_id(
+        db,
+        lesson_id,
+    )
+
+    if not lesson:
+        raise HTTPException(
+            status_code=404,
+            detail="Lesson not found",
+        )
+
+    return lesson
+
+
+@router.get("/lessons/search")
+async def search_lessons(
+    db: DBSession,
+    _: RequireSuperAdmin,
+    class_name: str,
+    subject_name: str,
+    session_name: str,
+    term_name: str,
+):
+    return await lesson_service.get_lessons_filtered(
+        db,
+        class_name=class_name,
+        subject_name=subject_name,
+        session_name=session_name,
+        term_name=term_name,
+    )

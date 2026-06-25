@@ -1,7 +1,10 @@
+from uuid import UUID
+
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.classes import Class
+from app.models.subject import Subject
 from app.models.user import User, UserRole
 
 
@@ -56,6 +59,96 @@ class SchoolAdminRepository:
             ),
         )
         return result.scalars().all()
+    # ==================================================
+    # UPDATE STUDENT
+    # ==================================================
+
+    async def get_student_by_id(
+        self,
+        db: AsyncSession,
+        school_id: UUID,
+        student_id: UUID,
+    ):
+        result = await db.execute(
+            select(User).where(
+                User.id == student_id,
+                User.school_id == school_id,
+                User.role == UserRole.STUDENT,
+            )
+        )
+        return result.scalar_one_or_none()
+
+    # ==================================================
+    # UPDATE TEACHER
+    # ==================================================
+
+    async def get_teacher_by_id(
+        self,
+        db: AsyncSession,
+        school_id: UUID,
+        teacher_id: UUID,
+    ):
+        result = await db.execute(
+            select(User).where(
+                User.id == teacher_id,
+                User.school_id == school_id,
+                User.role == UserRole.TEACHER,
+            )
+        )
+        return result.scalar_one_or_none()
+
+    # ==================================================
+    # UPDATE CLASS
+    # ==================================================
+
+    async def get_class_by_id(
+        self,
+        db: AsyncSession,
+        school_id: UUID,
+        class_id: UUID,
+    ):
+        result = await db.execute(
+            select(Class).where(
+                Class.id == class_id,
+                Class.school_id == school_id,
+            )
+        )
+        return result.scalar_one_or_none()
+
+    # ==================================================
+    # SUBJECTS
+    # ==================================================
+
+    async def get_subject_by_id(
+        self,
+        db: AsyncSession,
+        school_id: UUID,
+        subject_id: UUID,
+    ):
+        result = await db.execute(
+            select(Subject).where(
+                Subject.id == subject_id,
+                Subject.school_id == school_id,
+            )
+        )
+        return result.scalar_one_or_none()
+
+    async def delete_subject(
+        self,
+        db: AsyncSession,
+        subject: Subject,
+    ):
+        await db.delete(subject)
+
+    # ==================================================
+    # SAVE
+    # ==================================================
+
+    async def commit(self, db: AsyncSession):
+        await db.commit()
+
+    async def refresh(self, db: AsyncSession, obj):
+        await db.refresh(obj)
 
 
 school_admin_repo = SchoolAdminRepository()

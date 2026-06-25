@@ -43,6 +43,23 @@ class TermRepository:
         )
 
         return result.scalars().all()
+    async def get_active(
+        self,
+        db: AsyncSession,
+        school_id: str | None = None,
+    ):
+        query = select(Term).where(
+            Term.is_active == True
+        )
+
+        if school_id:
+            query = query.where(
+                Term.school_id == school_id
+            )
+
+        result = await db.execute(query)
+
+        return result.scalar_one_or_none()
 
 
 term_repo = TermRepository()

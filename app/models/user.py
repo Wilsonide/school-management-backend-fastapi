@@ -7,6 +7,7 @@ from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TenantMixin, TimestampMixin, UUIDMixin
+
 if TYPE_CHECKING:
     from .refresh_token import RefreshToken
 
@@ -36,25 +37,25 @@ class User(Base, UUIDMixin, TimestampMixin, TenantMixin):
 
     email = mapped_column(String(255), unique=True)
 
-    username = mapped_column(String(255),nullable = True)
+    username = mapped_column(String(255), nullable=True)
     avatar_url: Mapped[str | None] = mapped_column(
-    String(255),
-    nullable=True,
-)
+        String(255),
+        nullable=True,
+    )
     access_token = mapped_column(Text)
     password_hash = mapped_column(Text)
 
     is_active = mapped_column(Boolean, default=True)
 
     phone: Mapped[str | None] = mapped_column(
-    String(50),
-    nullable=True,
-)
+        String(50),
+        nullable=True,
+    )
 
     last_login: Mapped[datetime | None] = mapped_column(
-    DateTime(timezone=True),
-    nullable=True,
-)
+        DateTime(timezone=True),
+        nullable=True,
+    )
 
     role: Mapped[UserRole] = mapped_column(SQLEnum(UserRole))
     profile_completed: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -63,6 +64,7 @@ class User(Base, UUIDMixin, TimestampMixin, TenantMixin):
     back_populates="user",
     cascade="all, delete-orphan",
 )
+
     student_profile = relationship(
         "StudentProfile",
         back_populates="user",
@@ -84,7 +86,27 @@ class User(Base, UUIDMixin, TimestampMixin, TenantMixin):
         cascade="all, delete-orphan",
     )
 
-    school = relationship("School", back_populates="users")
+    attendance_records = relationship(
+    "AttendanceRecord",
+    back_populates="student",
+)
+
+    teacher_assignments = relationship(
+        "TeacherClassSubject",
+        back_populates="teacher",
+        cascade="all, delete-orphan",
+    )
+
+    enrollments = relationship(
+        "StudentEnrollment",
+        back_populates="student",
+        cascade="all, delete-orphan",
+    )
+
+    school = relationship(
+        "School",
+        back_populates="users",
+    )
 
     __table_args__ = (
         UniqueConstraint(

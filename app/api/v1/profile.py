@@ -5,12 +5,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import CurrentUser
 from app.db.database import get_db
-
 from app.services.profile_service import ProfileService
 
-
-
-router = APIRouter(tags=["Profile"], prefix="/profile")
+router = APIRouter(
+    tags=["Profile"],
+    prefix="/profile",
+)
 
 profile_service = ProfileService()
 
@@ -25,13 +25,16 @@ async def get_my_profile(
         user=current_user,
     )
 
-    if not profile:
-        raise HTTPException(
-            status_code=404,
-            detail="Profile not found",
-        )
-
     return {
+        "user": {
+            "id": str(current_user.id),
+            "first_name": current_user.first_name,
+            "last_name": current_user.last_name,
+            "email": current_user.email,
+            "phone": current_user.phone,
+            "role": current_user.role,
+            "profile_completed": current_user.profile_completed,
+        },
         "profile": profile,
     }
 
@@ -40,19 +43,19 @@ async def get_my_profile(
 async def update_my_profile(
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: CurrentUser,
-
-    payload: dict,  # we validate inside service using schemas
+    payload: dict,
 ):
-    updated = await profile_service.update_profile(
+    result = await profile_service.update_profile(
         db=db,
         user=current_user,
         payload=payload,
     )
 
     return {
-        "message": "Profile updated",
-        "profile": updated,
+        "message": "Profile updated successfully",
+        **result,
     }
+
 
 @router.post("/create")
 async def create_profile(
@@ -60,23 +63,30 @@ async def create_profile(
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: CurrentUser,
 ):
-    """
-    Creates profile after signup/login onboarding step
-    """
+    existing = await profile_service.get_by_user_id(
+        db=db,
+        user=current_user,
+    )
 
-    if current_user.profile_completed:
+    if existing:
         raise HTTPException(
             status_code=400,
             detail="Profile already exists",
         )
 
-    profile = await profile_service.create_profile(
-        db=db,
-        user=current_user,
-        payload=payload,
-    )
-
-    return {
-        "message": "Profile created successfully",
-        "profile": profile,
-    }
+    try:
+        result = await profile_service.create_profile(
+            db=db,
+            user=current_user,
+            payload=payload,
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=400,
+            detail=str(e),
+        ) from e
+    else:
+        return {
+            "message": "Profile created successfully",
+            **result,
+        }
