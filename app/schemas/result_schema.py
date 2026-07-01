@@ -32,11 +32,8 @@ class StudentResultInput(BaseModel):
 
 class ResultBatchCreate(BaseModel):
     class_id: UUID
-
-    session_id: UUID
-
-    term_id: UUID
-
+    session_id: UUID | None = None
+    term_id: UUID | None = None
     students: list[StudentResultInput]
 
 
@@ -48,8 +45,22 @@ class ResultBatchCreate(BaseModel):
 class UpdateTeacherComment(BaseModel):
     teacher_comment: str
 
+
+class UpdateResultRecord(BaseModel):
+    ca_score: int = Field(..., ge=0, le=40)
+    exam_score: int = Field(..., ge=0, le=60)
+    teacher_comment: str | None = None
+
+
 class TeacherComment(BaseModel):
     comment: str
+
+
+class ResultStatusResponse(BaseModel):
+    exists: bool
+    editable: bool | None = None
+    status: str | None = None
+    batch_id: UUID | None = None
 
 
 # =====================================================
@@ -250,12 +261,11 @@ class ResultApprovalResponse(BaseModel):
 
 
 class ResultSubmissionResponse(BaseModel):
+    created: bool
     batch_id: UUID
-
     status: str
-
+    message: str
     total_students: int
-
     total_records: int
 
 

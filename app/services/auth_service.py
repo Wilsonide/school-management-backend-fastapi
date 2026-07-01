@@ -1,29 +1,33 @@
+import secrets
+from datetime import UTC, datetime, timedelta
+
 from app.models.password_reset import PasswordResetToken
 from app.models.refresh_token import RefreshToken
-from datetime import UTC, datetime, timedelta
-import secrets
-
-
 from app.repositories.refresh_token_repository import RefreshTokenRepository
 from app.services.email_service import email_service
-
 from app.services.user_service import UserService
-from app.utils.helper import create_access_token, create_refresh_token, hash_password, hash_refresh_token, verify_password
+from app.utils.helper import (
+    create_access_token,
+    create_refresh_token,
+    hash_password,
+    hash_refresh_token,
+    verify_password,
+)
 
 
 class AuthService:
     def __init__(self):
         self.user_service = UserService()
         self.refresh_repo = RefreshTokenRepository()
-        self.email_service = email_service  # Placeholder for email sending service
+        self.email_service = email_service
 
     async def register(
-    self,
-    db,
-    username: str,
-    email: str,
-    password: str,
-):
+        self,
+        db,
+        username: str,
+        email: str,
+        password: str,
+    ):
         school_slug, actual_username = username.split("_", 1)
         school = await self.user_service.get_school_by_slug(
             db,
@@ -41,12 +45,10 @@ class AuthService:
         if existing_email:
             return None
 
-        existing_username = (
-            await self.user_service.get_by_school_slug_and_username(
-                db,
-                school_slug,
-                actual_username,
-            )
+        existing_username = await self.user_service.get_by_school_slug_and_username(
+            db,
+            school_slug,
+            actual_username,
         )
 
         if existing_username:
@@ -64,12 +66,11 @@ class AuthService:
         return user
 
     async def login(
-    self,
-    db,
-    username: str,
-    password: str,
-):
-
+        self,
+        db,
+        username: str,
+        password: str,
+    ):
         user = None
 
         # -----------------------------------
@@ -80,7 +81,6 @@ class AuthService:
         # schooladmin
         # -----------------------------------
         if "_" not in username:
-
             user = await self.user_service.get_by_email(
                 db,
                 username,
@@ -95,7 +95,6 @@ class AuthService:
         # lerna_john
         # -----------------------------------
         else:
-
             school_slug, actual_username = username.split("_", 1)
 
             user = await self.user_service.get_by_school_slug_and_username(
@@ -123,11 +122,7 @@ class AuthService:
             {
                 "sub": str(user.id),
                 "role": user.role,
-                "school_id": (
-                    str(user.school_id)
-                    if user.school_id
-                    else None
-                ),
+                "school_id": (str(user.school_id) if user.school_id else None),
             }
         )
 
@@ -138,8 +133,7 @@ class AuthService:
             token_hash=hash_refresh_token(
                 refresh_token,
             ),
-            expires_at=datetime.now(UTC)
-            + timedelta(days=30),
+            expires_at=datetime.now(UTC) + timedelta(days=30),
         )
 
         await self.refresh_repo.create(
@@ -157,16 +151,12 @@ class AuthService:
                 "role": user.role,
                 "first_name": user.first_name,
                 "last_name": user.last_name,
-                "school_id": (
-                    str(user.school_id)
-                    if user.school_id
-                    else None
-                ),
+                "school_id": (str(user.school_id) if user.school_id else None),
                 "profile_completed": user.profile_completed,
             },
         }
-    async def forgot_password(self, db, email: str):
 
+    async def forgot_password(self, db, email: str):
         user = await self.user_service.get_by_email(db, email)
 
         if not user:
@@ -185,22 +175,20 @@ class AuthService:
 
         reset_link = f"http://localhost:3000/reset-password?token={token}"
 
-        email_service.send_email(
+        await self.email_service.send_email(
             to=user.email,
             subject="Password Reset",
             body=f"Click to reset password: {reset_link}",
         )
 
         return True
-    
-    async def reset_password(self, db, token: str, new_password: str):
 
+    async def reset_password(self, db, token: str, new_password: str):
         result = await db.execute(
             """
             SELECT * FROM password_reset_tokens
             WHERE token = :token
-            """
-            ,
+            """,
             {"token": token},
         )
 
@@ -230,17 +218,15 @@ class AuthService:
         await db.commit()
 
         return True
-    async def refresh_access_token(
-    self,
-    db,
-    refresh_token: str,
-):
 
-        token_record = (
-            await self.refresh_repo.get_by_hash(
-                db,
-                hash_refresh_token(refresh_token),
-            )
+    async def refresh_access_token(
+        self,
+        db,
+        refresh_token: str,
+    ):
+        token_record = await self.refresh_repo.get_by_hash(
+            db,
+            hash_refresh_token(refresh_token),
         )
 
         if not token_record:
@@ -269,5 +255,6 @@ class AuthService:
         )
 
         return access_token
+
 
 authservice = AuthService()

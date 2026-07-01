@@ -39,7 +39,6 @@ class ClassSubject(
         ),
     )
 
-    
     school_class = relationship(
         "Class",
         back_populates="class_subjects",

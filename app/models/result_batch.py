@@ -86,3 +86,4 @@ class ResultBatch(
     session = relationship("AcademicSession")
     term = relationship("Term")
     creator = relationship("User")
+    school = relationship("School")

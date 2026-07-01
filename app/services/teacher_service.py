@@ -34,13 +34,7 @@ class TeacherService:
 
         return list(unique_classes.values())
 
-    async def get_class_students(
-    self,
-    db,
-    user,
-    class_id,
-    school_id
-):
+    async def get_class_students(self, db, user, class_id, school_id):
         has_access = await self.repo.teacher_has_class_access(
             db=db,
             teacher_id=user.id,
@@ -48,9 +42,7 @@ class TeacherService:
         )
 
         if not has_access:
-            raise ValueError(
-                "You are not assigned to this class"
-            )
+            raise ValueError("You are not assigned to this class")
 
         active_session = await self.session_repo.get_active(
             db,
@@ -70,16 +62,15 @@ class TeacherService:
         )
 
         return [
-                {
-                    "id": str(student.user.id),
-                    "first_name": student.user.first_name,
-                    "last_name": student.user.last_name,
-                    "email": student.user.email,
-                    "admission_number": student.admission_number,
-                }
-                for student in students
-            ]
-        
+            {
+                "id": str(student.user.id),
+                "first_name": student.user.first_name,
+                "last_name": student.user.last_name,
+                "email": student.user.email,
+                "admission_number": student.admission_number,
+            }
+            for student in students
+        ]
 
     async def get_subjects(
         self,
@@ -99,9 +90,8 @@ class TeacherService:
                 detail="You are not assigned to this class",
             )
 
-        assignments = await self.repo.get_teacher_subjects(
+        assignments = await self.repo.get_class_subjects(
             db,
-            teacher.id,
             class_id,
         )
 

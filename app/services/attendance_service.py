@@ -117,21 +117,52 @@ class AttendanceService:
             "message": "Attendance submitted successfully",
         }
 
+    async def get_student_term_history(
+        self,
+        db,
+        student,
+        session_id,
+        term_id,
+    ):
+        rows = await self.repo.get_student_attendance_history(
+            db=db,
+            school_id=student.school_id,
+            student_id=student.id,
+            session_id=session_id,
+            term_id=term_id,
+        )
+
+        return [
+            {
+                "attendance_date": str(date),
+                "status": status,
+                "created_at": created_at.isoformat() if created_at else None,
+            }
+            for date, status, created_at in rows
+        ]
+
     async def get_class_attendance(
         self,
         db,
-        school_id,
+        teacher,
         class_id,
-        session_id,
-        term_id,
         attendance_date,
     ):
+        active_session = await self.session_repo.get_active(
+            db,
+            teacher.school_id,
+        )
+
+        active_term = await self.term_repo.get_active(
+            db,
+            teacher.school_id,
+        )
         sheet = await self.repo.get_class_attendance(
             db=db,
-            school_id=school_id,
+            school_id=teacher.school_id,
             class_id=class_id,
-            session_id=session_id,
-            term_id=term_id,
+            session_id=active_session.id,
+            term_id=active_term.id,
             attendance_date=attendance_date,
         )
 
@@ -222,35 +253,59 @@ class AttendanceService:
             session_id=session_id,
             term_id=term_id,
         )
+
         stats = {
             AttendanceStatus.PRESENT: 0,
             AttendanceStatus.ABSENT: 0,
             AttendanceStatus.LATE: 0,
         }
 
-        for status, count in rows:
-            stats[status] = count
-        total_days = sum(
-            stats.values(),
-        )
+        history = []
+
+        total_present = 0
+        total_absent = 0
+        total_late = 0
+
+        for row in rows:
+            date, present, absent, late = row
+
+            present = present or 0
+            absent = absent or 0
+            late = late or 0
+
+            total_present += present
+            total_absent += absent
+            total_late += late
+
+            history.append(
+                {
+                    "date": date,
+                    "present": present,
+                    "absent": absent,
+                    "late": late,
+                }
+            )
+
+        total_days = len(history)
 
         attendance_rate = 0
-
         if total_days:
             attendance_rate = round(
                 (
-                    (stats[AttendanceStatus.PRESENT] + stats[AttendanceStatus.LATE])
-                    / total_days
+                    (total_present + total_late)
+                    / (total_present + total_absent + total_late)
                 )
                 * 100,
                 2,
             )
+
         return {
             "total_days": total_days,
-            "present": stats[AttendanceStatus.PRESENT],
-            "absent": stats[AttendanceStatus.ABSENT],
-            "late": stats[AttendanceStatus.LATE],
+            "present": total_present,
+            "absent": total_absent,
+            "late": total_late,
             "attendance_rate": attendance_rate,
+            "history": history,
         }
 
     async def get_dashboard(
@@ -265,19 +320,26 @@ class AttendanceService:
             attendance_date,
         )
 
+        rankings = await self.repo.get_dashboard_class_rankings(
+            db,
+            school_id,
+            attendance_date,
+        )
+
         total_students = await self.repo.get_total_students(
             db,
             school_id,
         )
+
         counter = Counter()
 
         for status, count in rows:
             counter[status] = count
+
         present = counter[AttendanceStatus.PRESENT]
-
         absent = counter[AttendanceStatus.ABSENT]
-
         late = counter[AttendanceStatus.LATE]
+
         attendance_rate = 0
 
         if total_students:
@@ -285,6 +347,32 @@ class AttendanceService:
                 ((present + late) / total_students) * 100,
                 2,
             )
+
+        class_rankings = []
+
+        for row in rankings:
+            total = row.total or 0
+
+            percentage = (
+                round(((row.present + row.late) / total) * 100, 2) if total else 0
+            )
+
+            class_rankings.append(
+                {
+                    "class_id": str(row.class_id),
+                    "class_name": row.class_name,
+                    "present": row.present,
+                    "absent": row.absent,
+                    "late": row.late,
+                    "attendance_percentage": percentage,
+                }
+            )
+
+        class_rankings.sort(
+            key=lambda x: x["attendance_percentage"],
+            reverse=True,
+        )
+
         return {
             "date": attendance_date,
             "total_students": total_students,
@@ -292,6 +380,7 @@ class AttendanceService:
             "absent": absent,
             "late": late,
             "attendance_rate": attendance_rate,
+            "class_rankings": class_rankings,
         }
 
 

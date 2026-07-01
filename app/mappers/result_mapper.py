@@ -1,17 +1,18 @@
+from collections import defaultdict
+
 from app.schemas.result_responses import (
     ApprovalHistoryItem,
     ClassResultResponse,
-    ClassStudentResultResponse,
+    ClassStudentResponse,
+    ClassSubjectResponse,
     StudentResultResponse,
     SubjectResultResponse,
 )
 
+
 class ResultMapper:
     @staticmethod
-    def approval_history(
-        history,
-    ):
-
+    def approval_history(history):
         return [
             ApprovalHistoryItem(
                 id=item.id,
@@ -22,65 +23,79 @@ class ResultMapper:
             )
             for item in history
         ]
+
+    # ======================================================
+    # CLASS RESULT SHEET
+    # ======================================================
+
     @staticmethod
-    def student_result(
-        result,
-    ):
+    def class_result(batch):
+        """
+        Batch
+            -> Subjects
+            -> Students
+            -> Subject scores
+        """
 
-        summary = result["summary"]
+        grouped = defaultdict(list)
 
-        records = result["records"]
+        # collect unique subjects
+        subject_map = {}
 
-        subjects = [
-            SubjectResultResponse(
-                subject_id=r.subject_id,
-                subject_name=r.subject.name,
-                ca_score=r.ca_score,
-                exam_score=r.exam_score,
-                total_score=r.total_score,
-                grade=r.grade,
-                remark=r.remark,
-                teacher_comment=r.teacher_comment,
-            )
-            for r in records
-        ]
+        for record in batch.records:
+            grouped[record.student_id].append(record)
 
-        return StudentResultResponse(
-            student_id=summary.student_id,
-            total_score=summary.total_score,
-            average_score=summary.average_score,
-            position=summary.position,
-            passed_subjects=summary.passed_subjects,
-            failed_subjects=summary.failed_subjects,
-            subjects=subjects,
+            if record.subject_id not in subject_map:
+                subject_map[record.subject_id] = ClassSubjectResponse(
+                    subject_id=record.subject_id,
+                    subject_name=record.subject.name,
+                )
+
+        subjects = sorted(
+            subject_map.values(),
+            key=lambda x: x.subject_name,
         )
-    @staticmethod
-    def class_result(
-        batch,
-    ):
 
         students = []
 
-        for summary in batch.summaries:
-
+        for summary in sorted(
+            batch.summaries,
+            key=lambda x: x.position,
+        ):
             student = summary.student
 
+            student_subjects = []
+
+            for record in sorted(
+                grouped.get(student.id, []),
+                key=lambda r: r.subject.name,
+            ):
+                student_subjects.append(
+                    SubjectResultResponse(
+                        record_id=record.id,
+                        subject_id=record.subject_id,
+                        subject_name=record.subject.name,
+                        ca_score=record.ca_score,
+                        exam_score=record.exam_score,
+                        total_score=record.total_score,
+                        grade=record.grade,
+                        remark=record.remark,
+                        teacher_comment=record.teacher_comment,
+                    )
+                )
+
             students.append(
-                ClassStudentResultResponse(
+                ClassStudentResponse(
                     student_id=student.id,
-                    student_name=(
-                        f"{student.first_name} "
-                        f"{student.last_name}"
-                    ),
+                    student_name=f"{student.first_name} {student.last_name}",
                     total_score=summary.total_score,
                     average_score=summary.average_score,
                     position=summary.position,
+                    passed_subjects=summary.passed_subjects,
+                    failed_subjects=summary.failed_subjects,
+                    subjects=student_subjects,
                 )
             )
-
-        students.sort(
-            key=lambda x: x.position,
-        )
 
         return ClassResultResponse(
             batch_id=batch.id,
@@ -88,5 +103,59 @@ class ResultMapper:
             session_id=batch.session_id,
             term_id=batch.term_id,
             status=batch.status,
+            editable=batch.status
+            in (
+                "DRAFT",
+                "SUBMITTED",
+                "REJECTED",
+            ),
+            subjects=subjects,
             students=students,
+        )
+
+    # ======================================================
+    # SINGLE STUDENT RESULT
+    # ======================================================
+
+    @staticmethod
+    def student_result(result):
+        """
+        Converts a single student's result into StudentResultResponse.
+        """
+
+        summary = result["summary"]
+        records = result["records"]
+
+        student = summary.student
+        batch = summary.batch
+
+        subjects = []
+
+        for record in sorted(records, key=lambda r: r.subject.name):
+            subjects.append(
+                SubjectResultResponse(
+                    record_id=record.id,
+                    subject_id=record.subject_id,
+                    subject_name=record.subject.name,
+                    ca_score=record.ca_score,
+                    exam_score=record.exam_score,
+                    total_score=record.total_score,
+                    grade=record.grade,
+                    remark=record.remark,
+                    teacher_comment=record.teacher_comment,
+                )
+            )
+
+        return StudentResultResponse(
+            student_id=student.id,
+            student_name=f"{student.first_name} {student.last_name}",
+            class_name=batch.school_class.name,
+            session_name=batch.session.name,
+            term_name=batch.term.name,
+            total_score=summary.total_score,
+            average_score=summary.average_score,
+            position=summary.position,
+            passed_subjects=summary.passed_subjects,
+            failed_subjects=summary.failed_subjects,
+            subjects=subjects,
         )

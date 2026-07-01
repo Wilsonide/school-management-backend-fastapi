@@ -36,11 +36,7 @@ class DashboardService:
             user.id,
         )
 
-        total = (
-            attendance["present"]
-            + attendance["absent"]
-            + attendance["late"]
-        )
+        total = attendance["present"] + attendance["absent"] + attendance["late"]
 
         rate = (
             round(
@@ -56,14 +52,8 @@ class DashboardService:
 
         return {
             "student_name": f"{user.first_name} {user.last_name}",
-            "admission_number": (
-                profile.admission_number if profile else None
-            ),
-            "class_name": (
-                enrollment.school_class.name
-                if enrollment
-                else None
-            ),
+            "admission_number": (profile.admission_number if profile else None),
+            "class_name": (enrollment.school_class.name if enrollment else None),
             "active_session": {
                 "id": str(session.id),
                 "name": session.name,
@@ -80,12 +70,8 @@ class DashboardService:
                 **attendance,
                 "attendance_rate": rate,
             },
-            "average_score": (
-                summary.average_score if summary else 0
-            ),
-            "position": (
-                summary.position if summary else None
-            ),
+            "average_score": (summary.average_score if summary else 0),
+            "position": (summary.position if summary else None),
         }
 
     # ==========================================
@@ -104,9 +90,9 @@ class DashboardService:
         )
 
         # TeacherClassSubject assignments
-        subject_assignments = await self.repo.get_teacher_assignments(
+        subject_assignments = await self.repo.get_class_assignments(
             db,
-            user.id,
+            classes[0].id,
         )
 
         attendance_submissions = await self.repo.count_teacher_attendance(
@@ -141,30 +127,23 @@ class DashboardService:
             }
             if term
             else None,
-
             # ClassTeacher
             "assigned_classes": len(classes),
-
             # TeacherClassSubject
-            "assigned_subjects": len(
-                {
-                    str(x.subject_id)
-                    for x in subject_assignments
-                }
-            ),
-
+            "assigned_subjects": len({str(x.subject_id) for x in subject_assignments}),
             "lessons_created": lessons_created or 0,
             "attendance_submissions": attendance_submissions or 0,
             "results_submitted": results_submitted or 0,
-
             "classes": [
                 {
-                    "id": str(x.class_id),
-                    "name": x.school_class.name,
+                    "id": str(row["id"]),
+                    "name": row["name"],
+                    "level": row["level"],
+                    "students_count": row["students_count"],
+                    "subjects_count": row["subjects_count"],
                 }
-                for x in classes
+                for row in classes
             ],
-
             "subject_assignments": [
                 {
                     "class_id": str(x.class_id),
@@ -185,17 +164,17 @@ class DashboardService:
         db,
         user,
     ):
-        classes = await self.repo.get_teacher_classes(
-            db,
-            user.id,
-        )
+        rows = await self.repo.get_teacher_classes(db, user.id)
 
         return [
             {
-                "id": str(x.class_id),
-                "name": x.school_class.name,
+                "id": str(row["id"]),
+                "name": row["name"],
+                "level": row["level"],
+                "students_count": row["students_count"],
+                "subjects_count": row["subjects_count"],
             }
-            for x in classes
+            for row in rows
         ]
 
 

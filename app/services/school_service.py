@@ -90,6 +90,26 @@ class SchoolService:
             "admin": admin,
         }
 
+    async def get_by_id(
+        self,
+        db,
+        school_id,
+    ):
+        return await self.repo.get_by_id(
+            db,
+            school_id,
+        )
+
+    async def get_by_slug(
+        self,
+        db,
+        slug,
+    ):
+        return await self.repo.get_by_slug(
+            db,
+            slug,
+        )
+
     # =====================================================
     # CREATE SCHOOL
     # =====================================================

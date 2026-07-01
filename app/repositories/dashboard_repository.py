@@ -7,7 +7,9 @@ from app.models.attendance_record import (
     AttendanceStatus,
 )
 from app.models.attendance_sheet import AttendanceSheet
+from app.models.class_subject import ClassSubject
 from app.models.class_teacher import ClassTeacher
+from app.models.classes import Class
 from app.models.enrollment import StudentEnrollment
 from app.models.lesson import Lesson
 from app.models.result_batch import ResultBatch
@@ -155,18 +157,19 @@ class DashboardRepository:
 
         return result.scalar_one_or_none()
 
-    async def get_teacher_assignments(
+    async def get_class_assignments(
         self,
         db,
-        teacher_id,
+        class_id,
     ):
         result = await db.execute(
-            select(TeacherClassSubject)
+            select(ClassSubject)
             .options(
-                selectinload(TeacherClassSubject.school_class),
-                selectinload(TeacherClassSubject.subject),
+                selectinload(ClassSubject.school_class),
+                selectinload(ClassSubject.subject),
             )
-            .where(TeacherClassSubject.teacher_id == teacher_id)
+            .where(ClassSubject.class_id == class_id)
+            .order_by(ClassSubject.subject_id)
         )
 
         return result.scalars().all()
@@ -203,54 +206,89 @@ class DashboardRepository:
             .select_from(ResultBatch)
             .where(ResultBatch.created_by == teacher_id)
         )
-    async def count_teacher_students(
-    self,
-    db,
-    teacher_id,
-):
-        result = await db.scalar(
-            select(
-                func.count(
-                    func.distinct(
-                        StudentEnrollment.student_id
-                    )
-                )
+
+    async def count_class_students(
+        self,
+        db,
+        class_id,
+    ):
+        return await db.scalar(
+            select(func.count(func.distinct(StudentEnrollment.student_id))).where(
+                StudentEnrollment.class_id == class_id
             )
+        )
+
+    async def count_class_subjects(
+        self,
+        db,
+        class_id,
+    ):
+        return await db.scalar(
+            select(func.count())
+            .select_from(ClassSubject)
+            .where(ClassSubject.class_id == class_id)
+        )
+
+    async def count_teacher_students(
+        self,
+        db,
+        teacher_id,
+    ):
+        result = await db.scalar(
+            select(func.count(func.distinct(StudentEnrollment.student_id)))
             .join(
                 ClassTeacher,
                 ClassTeacher.class_id == StudentEnrollment.class_id,
             )
-            .where(
-                ClassTeacher.teacher_id == teacher_id
-            )
+            .where(ClassTeacher.teacher_id == teacher_id)
         )
 
         return result or 0
+
     async def count_teacher_classes(
-    self,
-    db,
-    teacher_id,
-):
+        self,
+        db,
+        teacher_id,
+    ):
         return await db.scalar(
             select(func.count())
             .select_from(ClassTeacher)
-            .where(
-                ClassTeacher.teacher_id == teacher_id
-            )
-        )
-    async def get_teacher_classes(
-    self,
-    db,
-    teacher_id,
-):
-        result = await db.execute(
-            select(ClassTeacher)
-            .options(
-                selectinload(ClassTeacher.school_class)
-            )
-            .where(
-                ClassTeacher.teacher_id == teacher_id
-            )
+            .where(ClassTeacher.teacher_id == teacher_id)
         )
 
-        return result.scalars().all()
+    async def get_teacher_classes(
+        self,
+        db,
+        teacher_id,
+    ):
+        students_count = (
+            select(func.count(StudentEnrollment.student_id))
+            .where(StudentEnrollment.class_id == ClassTeacher.class_id)
+            .correlate(ClassTeacher)
+            .scalar_subquery()
+        )
+
+        subjects_count = (
+            select(func.count(ClassSubject.subject_id))
+            .where(ClassSubject.class_id == ClassTeacher.class_id)
+            .correlate(ClassTeacher)
+            .scalar_subquery()
+        )
+
+        result = await db.execute(
+            select(
+                ClassTeacher.class_id.label("id"),
+                Class.name,
+                Class.level,
+                students_count.label("students_count"),
+                subjects_count.label("subjects_count"),
+            )
+            .join(
+                Class,
+                Class.id == ClassTeacher.class_id,
+            )
+            .where(ClassTeacher.teacher_id == teacher_id)
+            .order_by(Class.name)
+        )
+
+        return result.mappings().all()

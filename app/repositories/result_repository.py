@@ -304,6 +304,32 @@ class ResultRepository:
     # =====================================================
     # EXISTENCE CHECKS
     # =====================================================
+    async def get_teacher_editable_batch(
+        self,
+        db: AsyncSession,
+        school_id,
+        class_id,
+        session_id,
+        term_id,
+    ):
+        result = await db.execute(
+            select(ResultBatch)
+            .options(
+                # ✅ records + nested subject/student
+                selectinload(ResultBatch.records).selectinload(ResultRecord.student),
+                selectinload(ResultBatch.records).selectinload(ResultRecord.subject),
+                # 🔥 MISSING PIECE (this is your crash)
+                selectinload(ResultBatch.summaries).selectinload(ResultSummary.student),
+            )
+            .where(
+                ResultBatch.school_id == school_id,
+                ResultBatch.class_id == class_id,
+                ResultBatch.session_id == session_id,
+                ResultBatch.term_id == term_id,
+            )
+        )
+
+        return result.scalar_one_or_none()
 
     async def result_exists(
         self,
@@ -312,9 +338,9 @@ class ResultRepository:
         class_id: UUID,
         session_id: UUID,
         term_id: UUID,
-    ) -> bool:
+    ) -> ResultBatch | None:
         result = await db.execute(
-            select(ResultBatch.id).where(
+            select(ResultBatch).where(
                 and_(
                     ResultBatch.school_id == school_id,
                     ResultBatch.class_id == class_id,
@@ -324,7 +350,7 @@ class ResultRepository:
             )
         )
 
-        return result.scalar_one_or_none() is not None
+        return result.scalar_one_or_none()
 
     async def get_class_result_batch(
         self,
@@ -337,7 +363,9 @@ class ResultRepository:
         result = await db.execute(
             select(ResultBatch)
             .options(
-                selectinload(ResultBatch.summaries).selectinload(ResultSummary.student)
+                selectinload(ResultBatch.records).selectinload(ResultRecord.student),
+                selectinload(ResultBatch.records).selectinload(ResultRecord.subject),
+                selectinload(ResultBatch.summaries).selectinload(ResultSummary.student),
             )
             .where(
                 and_(
@@ -351,8 +379,6 @@ class ResultRepository:
 
         return result.scalar_one_or_none()
 
-    from sqlalchemy.orm import selectinload
-
     async def get_student_published_result(
         self,
         db: AsyncSession,
@@ -360,6 +386,79 @@ class ResultRepository:
         student_id: UUID,
         session_id: UUID,
         term_id: UUID,
+    ):
+        result = await db.execute(
+            select(ResultBatch)
+            .join(ResultSummary)
+            .options(
+                selectinload(ResultBatch.session),
+                selectinload(ResultBatch.term),
+                selectinload(ResultBatch.school_class),
+                selectinload(ResultBatch.school),
+            )
+            .where(
+                and_(
+                    ResultBatch.school_id == school_id,
+                    ResultBatch.session_id == session_id,
+                    ResultBatch.term_id == term_id,
+                    ResultBatch.status == "PUBLISHED",
+                    ResultSummary.student_id == student_id,
+                )
+            )
+        )
+
+        batch = result.scalar_one_or_none()
+
+        if batch is None:
+            return None
+
+        return {
+            "batch": batch,
+            "summary": await self.get_student_summary(
+                db,
+                batch.id,
+                student_id,
+            ),
+            "records": await self.get_student_records(
+                db,
+                batch.id,
+                student_id,
+            ),
+        }
+
+    async def update_comment(
+        self,
+        db: AsyncSession,
+        record: ResultRecord,
+    ):
+        db.add(record)
+        await db.flush()
+        return record
+
+    async def delete_batch(
+        self,
+        db: AsyncSession,
+        batch: ResultBatch,
+    ):
+        await db.delete(batch)
+        await db.flush()
+
+    async def get_batch_statistics(
+        self,
+        db: AsyncSession,
+        batch_id: UUID,
+    ):
+        result = await db.execute(
+            select(ResultSummary).where(ResultSummary.batch_id == batch_id)
+        )
+
+        return result.scalars().all()
+
+    async def get_class_batches(
+        self,
+        db: AsyncSession,
+        school_id: UUID,
+        class_id: UUID,
     ):
         result = await db.execute(
             select(ResultBatch)
@@ -371,44 +470,226 @@ class ResultRepository:
             .where(
                 and_(
                     ResultBatch.school_id == school_id,
-                    ResultBatch.session_id == session_id,
-                    ResultBatch.term_id == term_id,
-                    ResultBatch.status == "PUBLISHED",
+                    ResultBatch.class_id == class_id,
+                )
+            )
+            .order_by(ResultBatch.updated_at.desc())
+        )
+
+        return result.scalars().all()
+
+    async def get_student_result_in_batch(
+        self,
+        db: AsyncSession,
+        batch_id: UUID,
+        student_id: UUID,
+    ):
+        result = await db.execute(
+            select(ResultRecord)
+            .options(selectinload(ResultRecord.subject))
+            .where(
+                and_(
+                    ResultRecord.batch_id == batch_id,
+                    ResultRecord.student_id == student_id,
                 )
             )
         )
 
-        batch = result.scalar_one_or_none()
+        return result.scalars().all()
 
-        if not batch:
-            return None
+    async def save_summary(
+        self,
+        db: AsyncSession,
+        summary: ResultSummary,
+    ):
+        db.add(summary)
+        await db.flush()
 
-        records = await self.get_student_records(
-            db,
-            batch.id,
-            student_id,
-        )
+        return summary
 
-        summary = await self.get_student_summary(
-            db,
-            batch.id,
-            student_id,
-        )
-
-        return {
-            "batch": batch,
-            "records": records,
-            "summary": summary,
-        }
-
-    async def update_comment(
+    async def save_record(
         self,
         db: AsyncSession,
         record: ResultRecord,
     ):
         db.add(record)
         await db.flush()
+
         return record
+
+    async def delete_batch_approvals(
+        self,
+        db: AsyncSession,
+        batch_id: UUID,
+    ):
+        result = await db.execute(
+            select(ResultApproval).where(ResultApproval.batch_id == batch_id)
+        )
+
+        for approval in result.scalars():
+            await db.delete(approval)
+
+        await db.flush()
+
+    async def delete_batch_summaries(
+        self,
+        db: AsyncSession,
+        batch_id: UUID,
+    ):
+        result = await db.execute(
+            select(ResultSummary).where(ResultSummary.batch_id == batch_id)
+        )
+
+        for summary in result.scalars():
+            await db.delete(summary)
+
+        await db.flush()
+
+    async def delete_batch_records(
+        self,
+        db: AsyncSession,
+        batch_id: UUID,
+    ):
+        result = await db.execute(
+            select(ResultRecord).where(ResultRecord.batch_id == batch_id)
+        )
+
+        for record in result.scalars():
+            await db.delete(record)
+
+        await db.flush()
+
+    async def get_existing_record(
+        self,
+        db: AsyncSession,
+        batch_id: UUID,
+        student_id: UUID,
+        subject_id: UUID,
+    ):
+        result = await db.execute(
+            select(ResultRecord).where(
+                and_(
+                    ResultRecord.batch_id == batch_id,
+                    ResultRecord.student_id == student_id,
+                    ResultRecord.subject_id == subject_id,
+                )
+            )
+        )
+
+        return result.scalar_one_or_none()
+
+    async def upsert_record(
+        self,
+        db: AsyncSession,
+        *,
+        batch_id: UUID,
+        school_id: UUID,
+        student_id: UUID,
+        subject_id: UUID,
+        ca_score: int,
+        exam_score: int,
+        total_score: int,
+        grade: str,
+        remark: str,
+        teacher_comment: str | None,
+    ):
+        record = await self.get_existing_record(
+            db=db,
+            batch_id=batch_id,
+            student_id=student_id,
+            subject_id=subject_id,
+        )
+
+        if record:
+            record.ca_score = ca_score
+            record.exam_score = exam_score
+            record.total_score = total_score
+            record.grade = grade
+            record.remark = remark
+            record.teacher_comment = teacher_comment
+
+        else:
+            record = ResultRecord(
+                school_id=school_id,
+                batch_id=batch_id,
+                student_id=student_id,
+                subject_id=subject_id,
+                ca_score=ca_score,
+                exam_score=exam_score,
+                total_score=total_score,
+                grade=grade,
+                remark=remark,
+                teacher_comment=teacher_comment,
+            )
+
+            db.add(record)
+
+        await db.flush()
+
+        return record
+
+    async def get_batch_details(
+        self,
+        db: AsyncSession,
+        batch_id: UUID,
+    ):
+        result = await db.execute(
+            select(ResultBatch)
+            .options(
+                selectinload(ResultBatch.records).selectinload(ResultRecord.subject),
+                selectinload(ResultBatch.records).selectinload(ResultRecord.student),
+                selectinload(ResultBatch.summaries),
+                selectinload(ResultBatch.approvals).selectinload(ResultApproval.actor),
+            )
+            .where(ResultBatch.id == batch_id)
+        )
+
+        return result.scalar_one_or_none()
+
+    async def get_current_batch(
+        self,
+        db: AsyncSession,
+        school_id: UUID,
+        class_id: UUID,
+        session_id: UUID,
+        term_id: UUID,
+    ):
+        result = await db.execute(
+            select(ResultBatch)
+            .options(
+                selectinload(ResultBatch.records).selectinload(ResultRecord.subject),
+                selectinload(ResultBatch.records).selectinload(ResultRecord.student),
+                selectinload(ResultBatch.summaries),
+            )
+            .where(
+                and_(
+                    ResultBatch.school_id == school_id,
+                    ResultBatch.class_id == class_id,
+                    ResultBatch.session_id == session_id,
+                    ResultBatch.term_id == term_id,
+                )
+            )
+        )
+
+        return result.scalar_one_or_none()
+
+    async def get_school_batches(
+        self,
+        db: AsyncSession,
+        school_id: UUID,
+    ):
+        result = await db.execute(
+            select(ResultBatch)
+            .options(
+                selectinload(ResultBatch.school_class),
+                selectinload(ResultBatch.session),
+                selectinload(ResultBatch.term),
+            )
+            .where(ResultBatch.school_id == school_id)
+            .order_by(ResultBatch.updated_at.desc())
+        )
+
+        return result.scalars().all()
 
 
 result_repository = ResultRepository()

@@ -1,32 +1,25 @@
+from app.models.attendance_record import AttendanceStatus
 from app.schemas.attendance import (
     AttendanceSheetResponse,
     AttendanceStudentResponse,
     StudentAttendanceRecordResponse,
     StudentAttendanceResponse,
 )
-from app.models.attendance_record import AttendanceStatus
 
 
 class AttendanceMapper:
-
     @staticmethod
     def class_sheet(sheet):
         present_count = sum(
-            1
-            for record in sheet.records
-            if record.status == AttendanceStatus.PRESENT
+            1 for record in sheet.records if record.status == AttendanceStatus.PRESENT
         )
 
         absent_count = sum(
-            1
-            for record in sheet.records
-            if record.status == AttendanceStatus.ABSENT
+            1 for record in sheet.records if record.status == AttendanceStatus.ABSENT
         )
 
         late_count = sum(
-            1
-            for record in sheet.records
-            if record.status == AttendanceStatus.LATE
+            1 for record in sheet.records if record.status == AttendanceStatus.LATE
         )
 
         return AttendanceSheetResponse(
@@ -42,12 +35,9 @@ class AttendanceMapper:
             records=[
                 AttendanceStudentResponse(
                     student_id=record.student_id,
-                    student_name=(
-                        f"{record.student.first_name} "
-                        f"{record.student.last_name}"
-                    ),
+                    student_name=f"{record.student.first_name} {record.student.last_name}",
                     status=record.status,
-                    note=record.remark,
+                    note=record.note,
                 )
                 for record in sheet.records
             ],
@@ -55,23 +45,11 @@ class AttendanceMapper:
 
     @staticmethod
     def student_history(records):
-        present_count = sum(
-            1
-            for r in records
-            if r.status == AttendanceStatus.PRESENT
-        )
+        present_count = sum(1 for r in records if r.status == AttendanceStatus.PRESENT)
 
-        absent_count = sum(
-            1
-            for r in records
-            if r.status == AttendanceStatus.ABSENT
-        )
+        absent_count = sum(1 for r in records if r.status == AttendanceStatus.ABSENT)
 
-        late_count = sum(
-            1
-            for r in records
-            if r.status == AttendanceStatus.LATE
-        )
+        late_count = sum(1 for r in records if r.status == AttendanceStatus.LATE)
 
         total = len(records)
 
@@ -93,7 +71,7 @@ class AttendanceMapper:
                 StudentAttendanceRecordResponse(
                     date=record.sheet.attendance_date,
                     status=record.status,
-                    note=record.remark,
+                    note=record.note,
                 )
                 for record in records
             ],

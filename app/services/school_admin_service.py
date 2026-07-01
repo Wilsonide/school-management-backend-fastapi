@@ -1,11 +1,11 @@
-from app.repositories.school_admin_repository import school_admin_repo
 from fastapi import HTTPException
 
+from app.repositories.school_admin_repository import school_admin_repo
 from app.schemas.school_admin import (
-    UpdateStudentRequest,
-    UpdateTeacherRequest,
     UpdateClassRequest,
+    UpdateStudentRequest,
     UpdateSubjectRequest,
+    UpdateTeacherRequest,
 )
 
 
@@ -64,13 +64,14 @@ class SchoolAdminService:
             }
             for t in users
         ]
+
     async def update_student(
-    self,
-    db,
-    school_id: str,
-    student_id: str,
-    payload: UpdateStudentRequest,
-):
+        self,
+        db,
+        school_id: str,
+        student_id: str,
+        payload: UpdateStudentRequest,
+    ):
         student = await self.repo.get_student_by_id(
             db,
             school_id,
@@ -92,6 +93,7 @@ class SchoolAdminService:
         return {
             "message": "Student updated successfully",
         }
+
     async def update_teacher(
         self,
         db,
@@ -120,14 +122,14 @@ class SchoolAdminService:
         return {
             "message": "Teacher updated successfully",
         }
-    
+
     async def update_class(
-    self,
-    db,
-    school_id: str,
-    class_id: str,
-    payload: UpdateClassRequest,
-):
+        self,
+        db,
+        school_id: str,
+        class_id: str,
+        payload: UpdateClassRequest,
+    ):
         school_class = await self.repo.get_class_by_id(
             db,
             school_id,
@@ -148,14 +150,14 @@ class SchoolAdminService:
         return {
             "message": "Class updated successfully",
         }
-    
+
     async def update_subject(
-    self,
-    db,
-    school_id: str,
-    subject_id: str,
-    payload: UpdateSubjectRequest,
-):
+        self,
+        db,
+        school_id: str,
+        subject_id: str,
+        payload: UpdateSubjectRequest,
+    ):
         subject = await self.repo.get_subject_by_id(
             db,
             school_id,
@@ -175,12 +177,13 @@ class SchoolAdminService:
         return {
             "message": "Subject updated successfully",
         }
+
     async def delete_subject(
-    self,
-    db,
-    school_id: str,
-    subject_id: str,
-):
+        self,
+        db,
+        school_id: str,
+        subject_id: str,
+    ):
         subject = await self.repo.get_subject_by_id(
             db,
             school_id,
@@ -203,14 +206,15 @@ class SchoolAdminService:
         return {
             "message": "Subject deleted successfully",
         }
+
     async def export_results(
-    self,
-    db,
-    school_id: str,
-    session_id: str,
-    term_id: str,
-    class_id: str,
-):
+        self,
+        db,
+        school_id: str,
+        session_id: str,
+        term_id: str,
+        class_id: str,
+    ):
         results = await self.result_repo.get_class_results(
             db=db,
             school_id=school_id,
@@ -220,14 +224,14 @@ class SchoolAdminService:
         )
 
         return results
-    
+
     async def export_attendance(
-    self,
-    db,
-    school_id: str,
-    session_id: str,
-    term_id: str,
-):
+        self,
+        db,
+        school_id: str,
+        session_id: str,
+        term_id: str,
+    ):
         rows = await self.attendance_repo.get_attendance_analytics(
             db=db,
             school_id=school_id,
@@ -236,4 +240,6 @@ class SchoolAdminService:
         )
 
         return rows
+
+
 school_admin_service = SchoolAdminService()

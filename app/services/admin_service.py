@@ -12,6 +12,12 @@ class AdminService:
     # =====================================
     # DASHBOARD STATS
     # =====================================
+    # =====================================
+    # GET ALL SCHOOLS
+    # =====================================
+
+    async def get_schools(self, db):
+        return await self.school_repo.get_schools(db)
 
     async def create_school_admin(self, db, payload):
         school = await self.school_repo.get_by_id(

@@ -23,6 +23,26 @@ class SchoolRepository:
 
         return result.scalars().first()
 
+    async def get_schools(self, db):
+        result = await db.execute(select(School).order_by(School.name))
+
+        schools = result.scalars().all()
+
+        return [
+            {
+                "id": school.id,
+                "name": school.name,
+                "slug": school.slug,
+                "email": school.email,
+                "phone": school.phone,
+                "state": school.state,
+                "website": school.website,
+                "subscription_plan": school.subscription_plan,
+                "is_active": school.is_active,
+            }
+            for school in schools
+        ]
+
     async def get_by_slug(
         self,
         db,

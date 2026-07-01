@@ -9,10 +9,23 @@ from app.core.deps import DBSession, RequireSchoolAdmin
 from app.db.database import get_db
 from app.schemas.academic_session import AcademicSessionCreate
 from app.schemas.attendance import AttendanceAnalyticsResponse
-from app.schemas.result_responses import ApprovalHistoryItem, ClassResultResponse
-from app.schemas.result_schema import PublishResultRequest, RejectResultRequest
+from app.schemas.result_responses import (
+    ApprovalHistoryItem,
+    ClassResultResponse,
+    ResultBatchCreate,
+)
+from app.schemas.result_schema import (
+    PublishResultRequest,
+    RejectResultRequest,
+    UpdateResultRecord,
+)
 from app.schemas.school import SchoolOnboardingRequest
-from app.schemas.school_admin import UpdateClassRequest, UpdateStudentRequest, UpdateSubjectRequest, UpdateTeacherRequest
+from app.schemas.school_admin import (
+    UpdateClassRequest,
+    UpdateStudentRequest,
+    UpdateSubjectRequest,
+    UpdateTeacherRequest,
+)
 from app.schemas.subject import CreateSubjectRequest
 from app.schemas.teacher_assignmet import CreateClassRequest, PromoteStudentsRequest
 from app.schemas.term import TermCreate
@@ -93,9 +106,8 @@ async def get_subjects(
         user.school_id,
     )
 
-@router.get(
-    "/classes/{class_id}/subjects"
-)
+
+@router.get("/classes/{class_id}/subjects")
 async def get_class_subjects(
     class_id: UUID,
     db: DBSession,
@@ -107,9 +119,8 @@ async def get_class_subjects(
         school_id=user.school_id,
     )
 
-@router.post(
-    "/classes/{class_id}/subjects/{subject_id}"
-)
+
+@router.post("/classes/{class_id}/subjects/{subject_id}")
 async def assign_subject_to_class(
     class_id: UUID,
     subject_id: UUID,
@@ -123,9 +134,8 @@ async def assign_subject_to_class(
         school_id=user.school_id,
     )
 
-@router.delete(
-    "/classes/{class_id}/subjects/{subject_id}"
-)
+
+@router.delete("/classes/{class_id}/subjects/{subject_id}")
 async def remove_subject_from_class(
     class_id: UUID,
     subject_id: UUID,
@@ -147,6 +157,7 @@ async def remove_subject_from_class(
     return {
         "message": "Subject removed from class",
     }
+
 
 # =====================================================
 # 📅 ACADEMIC SESSION
@@ -241,11 +252,77 @@ async def get_lessons(
 
 
 # =====================================================
-# 📊 RESULTS
+# RESULTS
 # =====================================================
+@router.get(
+    "/results/class",
+    response_model=ClassResultResponse,
+)
+async def get_class_results(
+    class_id: UUID,
+    session_id: UUID | None,
+    term_id: UUID | None,
+    db: DBSession,
+    user: RequireSchoolAdmin,
+):
+    return await result_service.get_class_results(
+        db=db,
+        school_id=user.school_id,
+        class_id=class_id,
+        session_id=session_id,
+        term_id=term_id,
+    )
 
 
-@router.post("/results/{batch_id}/approve")
+@router.get(
+    "/results/class/{class_id}/batches",
+)
+async def get_class_batches(
+    class_id: UUID,
+    db: DBSession,
+    user: RequireSchoolAdmin,
+):
+    return await result_service.get_class_batches(
+        db=db,
+        class_id=class_id,
+        school_id=user.school_id,
+    )
+
+
+@router.get(
+    "/results/{batch_id}",
+)
+async def get_batch(
+    batch_id: UUID,
+    db: DBSession,
+    user: RequireSchoolAdmin,
+):
+    return await result_service.get_batch_admin(
+        db=db,
+        batch_id=batch_id,
+        school_id=user.school_id,
+    )
+
+
+@router.get(
+    "/results/{batch_id}/view",
+    response_model=ClassResultResponse,
+)
+async def view_batch(
+    batch_id: UUID,
+    db: DBSession,
+    user: RequireSchoolAdmin,
+):
+    return await result_service.view_batch_admin(
+        db=db,
+        batch_id=batch_id,
+        school_id=user.school_id,
+    )
+
+
+@router.post(
+    "/results/{batch_id}/approve",
+)
 async def approve_result(
     batch_id: UUID,
     db: DBSession,
@@ -258,7 +335,9 @@ async def approve_result(
     )
 
 
-@router.post("/results/{batch_id}/reject")
+@router.post(
+    "/results/{batch_id}/reject",
+)
 async def reject_result(
     batch_id: UUID,
     payload: RejectResultRequest,
@@ -273,7 +352,9 @@ async def reject_result(
     )
 
 
-@router.post("/results/{batch_id}/publish")
+@router.post(
+    "/results/{batch_id}/publish",
+)
 async def publish_result(
     batch_id: UUID,
     db: DBSession,
@@ -286,23 +367,20 @@ async def publish_result(
     )
 
 
-@router.get(
-    "/results/class",
-    response_model=ClassResultResponse,
+@router.patch(
+    "/results/records/{record_id}",
 )
-async def get_class_results(
-    class_id: UUID,
-    session_id: UUID,
-    term_id: UUID,
+async def update_result_record(
+    record_id: UUID,
+    payload: UpdateResultRecord,
     db: DBSession,
     user: RequireSchoolAdmin,
 ):
-    return await result_service.get_class_results(
+    return await result_service.update_result_record(
         db=db,
-        school_id=user.school_id,
-        class_id=class_id,
-        session_id=session_id,
-        term_id=term_id,
+        record_id=record_id,
+        payload=payload,
+        user=user,
     )
 
 
@@ -583,9 +661,8 @@ async def class_teachers(
 # 📚 TEACHER SUBJECT ASSIGNMENTS
 # =====================================================
 
-@router.post(
-    "/classes/{class_id}/assign-teacher/{teacher_id}"
-)
+
+@router.post("/classes/{class_id}/assign-teacher/{teacher_id}")
 async def assign_teacher_to_class(
     class_id: UUID,
     teacher_id: UUID,
@@ -599,9 +676,8 @@ async def assign_teacher_to_class(
         school_id=user.school_id,
     )
 
-@router.delete(
-    "/classes/{class_id}/teachers/{teacher_id}"
-)
+
+@router.delete("/classes/{class_id}/teachers/{teacher_id}")
 async def remove_teacher_from_class(
     class_id: UUID,
     teacher_id: UUID,

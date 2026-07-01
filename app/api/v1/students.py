@@ -6,6 +6,7 @@ from fastapi.responses import StreamingResponse
 from app.core.deps import (
     DBSession,
     RequireStudent,
+    RequireStudentOrSchoolAdmin,
 )
 from app.schemas.result_responses import (
     StudentResultResponse,
@@ -32,7 +33,7 @@ router = APIRouter(
 @router.get("/classes")
 async def get_classes(
     db: DBSession,
-    user: RequireStudent,
+    user: RequireStudentOrSchoolAdmin,
 ):
     return await school_class_service.get_classes(
         db=db,
@@ -79,8 +80,7 @@ async def download_report_card(
 
     attendance = await attendance_service.get_student_attendance(
         db=db,
-        school_id=user.school_id,
-        student_id=user.id,
+        student=user,
         session_id=session_id,
         term_id=term_id,
     )

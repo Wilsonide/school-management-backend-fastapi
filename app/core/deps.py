@@ -157,6 +157,24 @@ def require_same_school_resource(resource_school_id: str):
     return dependency
 
 
+async def require_student_or_school_admin(
+    user: Annotated[User, Depends(get_current_user)],
+):
+    if user.role not in (
+        UserRole.STUDENT,
+        UserRole.SCHOOL_ADMIN,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized.",
+        )
+
+    return user
+
+
+RequireStudentOrSchoolAdmin = Annotated[User, Depends(require_student_or_school_admin)]
+
+
 # =====================================================
 # COMMON TYPE ALIASES (CLEANER ENDPOINTS)
 # =====================================================

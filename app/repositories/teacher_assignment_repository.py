@@ -1,12 +1,14 @@
 from uuid import UUID
 
-from sqlalchemy import and_, or_, select
+from sqlalchemy import and_, exists, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
+from app.models.class_subject import ClassSubject
 from app.models.class_teacher import ClassTeacher
 from app.models.enrollment import StudentEnrollment
 from app.models.student import StudentProfile
+from app.models.subject import Subject
 from app.models.teacher import TeacherProfile
 from app.models.teacher_class_subject import TeacherClassSubject
 
@@ -15,25 +17,17 @@ class TeacherAssignmentRepository:
     async def teacher_can_manage_class(
         self,
         db: AsyncSession,
-        teacher_user_id,
+        teacher_id,
         class_id,
     ) -> bool:
-        result = await db.execute(
+        return await db.scalar(
             select(
-                TeacherClassSubject.id,
+                exists().where(
+                    ClassTeacher.teacher_id == teacher_id,
+                    ClassTeacher.class_id == class_id,
+                )
             )
-            .join(
-                TeacherProfile,
-                TeacherProfile.id == TeacherClassSubject.teacher_id,
-            )
-            .where(
-                TeacherProfile.user_id == teacher_user_id,
-                TeacherClassSubject.class_id == class_id,
-            )
-            .limit(1)
         )
-
-        return result.scalar_one_or_none() is not None
 
     async def get_teacher_profile(
         self,
@@ -128,6 +122,20 @@ class TeacherAssignmentRepository:
                 TeacherClassSubject.class_id == class_id,
             )
             .options(joinedload(TeacherClassSubject.subject))
+        )
+
+        return result.scalars().all()
+
+    async def get_class_subjects(
+        self,
+        db,
+        class_id,
+    ):
+        result = await db.execute(
+            select(ClassSubject)
+            .where(ClassSubject.class_id == class_id)
+            .options(joinedload(ClassSubject.subject))
+            .order_by(ClassSubject.created_at)
         )
 
         return result.scalars().all()
